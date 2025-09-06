@@ -11,13 +11,13 @@ Team Structure
 
 ### 📅 DAY 1: Foundation & Setup
 🎯 Frontend Team (F1 & F2)
-Morning (4 hours):
+Morning (2 hours):
 
 F1: Project setup - (Already done)
 F2: Research & experiment with CesiumJS basics - create simple Earth globe
 Both: Define component structure and folder architecture
 
-Afternoon (4 hours):
+Afternoon (2 hours):
 
 F1: Build basic dashboard layout with navigation, sidebar, main content area
 F2: Integrate CesiumJS with ReactJs, create Earth component with basic camera controls
@@ -30,14 +30,14 @@ Both: Code review and merge initial components
 ✅ Dashboard skeleton
 
 ⚙️ Backend Developer (B1)
-Morning (4 hours):
+Morning (2 hours):
 
 Set up Express.js project with TypeScript
 Research and test Celestrak API for TLE data
 Set up MongoDB connection
 Install and test satellite-js library
 
-Afternoon (4 hours):
+Afternoon (2 hours):
 
 Create data fetcher for Celestrak TLE data
 Build basic API endpoints structure (/api/debris, /api/spaceweather)
@@ -51,14 +51,14 @@ Set up CORS and basic middleware
 ✅ Basic API structure
 
 🤖 AI/ML Engineer (AI1)
-Morning (4 hours):
+Morning (2 hours):
 
 Research orbital mechanics and debris prediction algorithms
 Study TLE format and satellite-js predictions
 Set up Python environment with TensorFlow/PyTorch
 Collect sample space weather data from NASA DONKI
 
-Afternoon (4 hours):
+Afternoon (2 hours):
 
 Create data preprocessing pipeline for TLE data
 Build basic orbital prediction using Keplerian elements
