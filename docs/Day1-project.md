@@ -34,7 +34,7 @@ Morning (2 hours):
 
 Set up Express.js project with TypeScript
 Research and test Celestrak API for TLE data
-Set up MongoDB connection
+Set up Supabase/Database connection
 Install and test satellite-js library
 
 Afternoon (2 hours):
@@ -45,25 +45,12 @@ Test TLE parsing with satellite-js
 Set up CORS and basic middleware
 
 ### Deliverables: We have to complete these today
-
+`
 ✅ Express server running
 ✅ TLE data fetching working
 ✅ Basic API structure
 
-🤖 AI/ML Engineer (AI1)
-Morning (2 hours):
-
-Research orbital mechanics and debris prediction algorithms
-Study TLE format and satellite-js predictions
-Set up Python environment with TensorFlow/PyTorch
-Collect sample space weather data from NASA DONKI
-
-Afternoon (2 hours):
-
-Create data preprocessing pipeline for TLE data
-Build basic orbital prediction using Keplerian elements
-Test simple linear extrapolation model
-Document data requirements
+q
 
 ### Deliverables: We have to complete these today
 
