@@ -1,11 +1,36 @@
 import { Router } from "express";
-import { getTLEData, getTLEDataFast, SaveSateliteTLEDataToDatabase, viewTheSpace } from "../../Controllers/SpaceController";
+import {
+  viewTheSpace,
+  getTLEData,
+  getTLEDataFast,
+  saveSatelliteDataToDatabase,
+  getDebrisData,
+  getSpaceWeatherData,
+  getSatelliteData,
+  testTLEParsing
+} from '../../Controllers/SpaceController';
 
 const router = Router();
 
-router.get("/api/space", viewTheSpace);
-router.get("/api/get-TLE-data",getTLEData)
-router.get("/api/get-TLE-data-fast",getTLEDataFast)
-router.post("/api/save-tle-data-db",SaveSateliteTLEDataToDatabase)
+// Base space endpoint
+router.get("/", viewTheSpace);
 
-export default router
+// TLE Data endpoints
+router.get("/tle", getTLEData);
+router.get("/tle/fast", getTLEDataFast);
+router.post("/tle/save", saveSatelliteDataToDatabase);
+router.get("/tle/test", testTLEParsing);
+
+// Debris data endpoint
+router.get("/debris", getDebrisData);
+
+// Space weather endpoint  
+router.get("/spaceweather", getSpaceWeatherData);
+
+// Enhanced satellite data endpoint
+router.get("/satellites", getSatelliteData);
+
+// Batch save endpoint
+router.post("/save", saveSatelliteDataToDatabase);
+
+export default router;

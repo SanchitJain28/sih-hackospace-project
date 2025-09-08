@@ -1,365 +1,456 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { DebrisObject, SpacecraftObject, SystemSettings } from '../types';
-import OrbitCalculator from '../utils/Orbits';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import * as Cesium from "cesium";
+import React, { useEffect, useRef, useState } from "react";
 
+// Set your Cesium Ion access token here
+// You can get a free token from https://cesium.com/ion/
+const CESIUM_ACCESS_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzQyYjZkMi02N2MyLTQxYjQtYWI4YS1lNGE5YzMyOGVmNjAiLCJpZCI6MzM5Mjg1LCJpYXQiOjE3NTczMTE3Njh9.d5tL7TnhBysu-6-dof3ws9bSvQex7322RBl-eOn_xuU";
+
+// Type Definitions
+type DebrisSize = "small" | "medium" | "large";
+type VelocityCategory = "slow" | "medium" | "fast";
+type RiskLevel = "high" | "medium" | "low";
+
+interface Debris {
+  id: string | number;
+  name: string;
+  altitude: number; // in km
+  velocity: number; // in km/s
+  size: DebrisSize;
+  mass: number; // in kg
+  type: string;
+  lon: number;
+  lat: number;
+}
+
+interface Filters {
+  altitudeRange: [number, number];
+  sizes: DebrisSize[];
+  velocity: VelocityCategory | "all";
+}
 
 interface GlobeProps {
-  debris: DebrisObject[];
-  spacecraft: SpacecraftObject[];
-  settings: SystemSettings;
-  selectedObject?: DebrisObject | SpacecraftObject;
-  onObjectSelect: (object: DebrisObject | SpacecraftObject) => void;
+  debrisData: Debris[];
+  filters: Filters;
+  fullScreen?: boolean; // New prop to control full screen mode
 }
 
-// Mock Cesium-like API for demonstration
-class MockCesium {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
-  private camera = { position: { x: 0, y: 0, z: 15000 }, rotation: 0 };
-  private animationFrame: number | null = null;
-  private objects: Array<{ position: { x: number; y: number; z: number }, color: string, size: number, id: string }> = [];
-  private orbits: Array<{ positions: Array<{ x: number; y: number; z: number }>, color: string }> = [];
+const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }) => {
+  const cesiumContainer = useRef<HTMLDivElement | null>(null);
+  const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const debrisEntitiesRef = useRef<Cesium.Entity[]>([]);
+  const [selectedDebris, setSelectedDebris] = useState<Debris | null>(null);
+  const [cesiumLoaded, setCesiumLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  constructor(container: HTMLElement) {
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = container.clientWidth;
-    this.canvas.height = container.clientHeight;
-    this.canvas.style.background = 'linear-gradient(to bottom, #000428, #004e92)';
-    container.appendChild(this.canvas);
-
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) throw new Error('Could not get canvas context');
-    this.ctx = ctx;
-
-    this.render();
-  }
-
-  addDebris(debris: DebrisObject[]) {
-    this.objects = debris.map(d => ({
-      position: d.position,
-      color: this.getRiskColor(d.riskLevel),
-      size: Math.max(2, Math.log(d.size * 100 + 1) * 2),
-      id: d.id
-    }));
-  }
-
-  addSpacecraft(spacecraft: SpacecraftObject[]) {
-    spacecraft.forEach(s => {
-      this.objects.push({
-        position: s.position,
-        color: s.type === 'ISS' ? '#00ff00' : '#ffff00',
-        size: 8,
-        id: s.id
-      });
-    });
-  }
-
-  addOrbit(debris: DebrisObject, show: boolean) {
-    if (!show || !debris.tle) return;
-
-    try {
-      const orbitData = OrbitCalculator.generateOrbitPositions(debris, 2, 50);
-      this.orbits.push({
-        positions: orbitData.positions,
-        color: this.getRiskColor(debris.riskLevel)
-      });
-    } catch (error) {
-      console.warn('Failed to generate orbit for', debris.id, error);
-    }
-  }
-
-  private getRiskColor(riskLevel: string): string {
-    switch (riskLevel) {
-      case 'critical': return '#ff0000';
-      case 'high': return '#ff6600';
-      case 'medium': return '#ffcc00';
-      case 'low': return '#00ff00';
-      default: return '#ffffff';
-    }
-  }
-
-  private project3D(pos: { x: number; y: number; z: number }): { x: number; y: number, visible: boolean } {
-    // Simple orthographic projection with rotation
-    const cos = Math.cos(this.camera.rotation);
-    const sin = Math.sin(this.camera.rotation);
-    
-    const rotX = pos.x * cos - pos.y * sin;
-    const rotY = pos.x * sin + pos.y * cos;
-    
-    const scale = 6371 / (Math.abs(pos.z - this.camera.position.z) + 6371) * 50;
-    
-    return {
-      x: this.canvas.width / 2 + rotX * scale,
-      y: this.canvas.height / 2 + rotY * scale,
-      visible: pos.z - this.camera.position.z > -20000
-    };
-  }
-
-  private drawStars() {
-    this.ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 200; i++) {
-      const x = Math.random() * this.canvas.width;
-      const y = Math.random() * this.canvas.height;
-      const size = Math.random() * 2;
-      this.ctx.globalAlpha = Math.random() * 0.8 + 0.2;
-      this.ctx.fillRect(x, y, size, size);
-    }
-    this.ctx.globalAlpha = 1;
-  }
-
-  private drawEarth() {
-    const center = this.project3D({ x: 0, y: 0, z: 0 });
-    const radius = 6371 * 50 / (Math.abs(-this.camera.position.z) + 6371);
-    
-    // Earth body
-    const gradient = this.ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radius);
-    gradient.addColorStop(0, '#4a90e2');
-    gradient.addColorStop(0.7, '#357abd');
-    gradient.addColorStop(1, '#1e3a5f');
-    
-    this.ctx.fillStyle = gradient;
-    this.ctx.beginPath();
-    this.ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
-    this.ctx.fill();
-
-    // Continents (simplified)
-    this.ctx.fillStyle = '#2d5a2d';
-    this.ctx.globalAlpha = 0.6;
-    for (let i = 0; i < 20; i++) {
-      const angle = (i * 18) * Math.PI / 180;
-      const x = center.x + Math.cos(angle) * radius * 0.7 * Math.random();
-      const y = center.y + Math.sin(angle) * radius * 0.7 * Math.random();
-      const size = radius * 0.1 * Math.random();
-      this.ctx.beginPath();
-      this.ctx.arc(x, y, size, 0, 2 * Math.PI);
-      this.ctx.fill();
-    }
-    this.ctx.globalAlpha = 1;
-  }
-
-  private render = () => {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    // Stars background
-    this.drawStars();
-    
-    // Earth
-    this.drawEarth();
-    
-    // Orbits
-    this.orbits.forEach(orbit => {
-      this.ctx.strokeStyle = orbit.color;
-      this.ctx.globalAlpha = 0.3;
-      this.ctx.lineWidth = 1;
-      this.ctx.beginPath();
-      
-      orbit.positions.forEach((pos, i) => {
-        const projected = this.project3D(pos);
-        if (projected.visible) {
-          if (i === 0) {
-            this.ctx.moveTo(projected.x, projected.y);
-          } else {
-            this.ctx.lineTo(projected.x, projected.y);
-          }
-        }
-      });
-      
-      this.ctx.stroke();
-      this.ctx.globalAlpha = 1;
-    });
-    
-    // Objects
-    this.objects.forEach(obj => {
-      const projected = this.project3D(obj.position);
-      if (projected.visible) {
-        this.ctx.fillStyle = obj.color;
-        this.ctx.beginPath();
-        this.ctx.arc(projected.x, projected.y, obj.size, 0, 2 * Math.PI);
-        this.ctx.fill();
-        
-        // Add glow effect
-        this.ctx.globalAlpha = 0.5;
-        this.ctx.beginPath();
-        this.ctx.arc(projected.x, projected.y, obj.size + 2, 0, 2 * Math.PI);
-        this.ctx.fill();
-        this.ctx.globalAlpha = 1;
-      }
-    });
-    
-    // Auto-rotate
-    this.camera.rotation += 0.005;
-    
-    this.animationFrame = requestAnimationFrame(this.render);
-  };
-
-  destroy() {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
-    this.canvas.remove();
-  }
-
-  zoomToISS() {
-    this.camera.position.z = 8000;
-  }
-
-  zoomToEarth() {
-    this.camera.position.z = 15000;
-  }
-
-  setAutoRotate(enabled: boolean) {
-    // Auto-rotate is always enabled in this demo
-  }
-}
-
-const Globe: React.FC<GlobeProps> = ({
-  debris,
-  spacecraft,
-  settings,
-  selectedObject,
-  onObjectSelect
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cesiumRef = useRef<MockCesium | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
+  // Initialize Cesium viewer
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!cesiumContainer.current || viewerRef.current) return;
 
-    // Initialize Cesium globe
     try {
-      cesiumRef.current = new MockCesium(containerRef.current);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Failed to initialize globe:', error);
+      if (CESIUM_ACCESS_TOKEN) {
+        Cesium.Ion.defaultAccessToken = CESIUM_ACCESS_TOKEN;
+      } else {
+        console.warn(
+          "Cesium ION Access Token not provided. Some features may not work."
+        );
+      }
+
+      const viewer = new Cesium.Viewer(cesiumContainer.current, {
+        timeline: false,
+        animation: false,
+        baseLayerPicker: false,
+        fullscreenButton: false,
+        vrButton: false,
+        geocoder: false,
+        homeButton: false,
+        infoBox: false,
+        sceneModePicker: false,
+        selectionIndicator: false,
+        navigationHelpButton: false,
+        creditContainer: document.createElement("div"), // Hides the default credit display
+        terrainProvider: undefined,
+      });
+
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(0, 20, 15000000),
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-60),
+          roll: 0,
+        },
+      });
+
+      viewer.scene.globe.enableLighting = true;
+      viewer.scene.backgroundColor = Cesium.Color.BLACK;
+      // Improve atmosphere rendering
+      viewer.scene.globe.showGroundAtmosphere = true;
+      viewer.scene.globe.atmosphereHueShift = -0.04;
+      viewer.scene.globe.atmosphereBrightnessShift = -0.1;
+      viewer.scene.globe.atmosphereSaturationShift = 0.25;
+
+      const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
+      handler.setInputAction((event: any) => {
+        const pickedObject = viewer.scene.pick(event.position);
+        if (
+          Cesium.defined(pickedObject) &&
+          (pickedObject.id as any)?.debrisData
+        ) {
+          setSelectedDebris((pickedObject.id as any).debrisData);
+        } else {
+          setSelectedDebris(null);
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+      // Force resize after initialization to ensure proper dimensions
+      setTimeout(() => {
+        viewer.resize();
+        setCesiumLoaded(true);
+        setError(null);
+      }, 100);
+
+      viewerRef.current = viewer;
+    } catch (err) {
+      console.error("Error initializing Cesium viewer:", err);
+      setError(`Failed to initialize Cesium: ${err}`);
     }
 
     return () => {
-      if (cesiumRef.current) {
-        cesiumRef.current.destroy();
+      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        try {
+          viewerRef.current.destroy();
+        } catch (err) {
+          console.error("Error destroying viewer:", err);
+        }
+        viewerRef.current = null;
       }
     };
   }, []);
 
+  // Handle window resize to keep Cesium responsive
   useEffect(() => {
-    if (!cesiumRef.current) return;
+    const handleResize = () => {
+      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        viewerRef.current.resize();
+      }
+    };
 
-    // Update debris visualization
-    cesiumRef.current.addDebris(debris);
-    cesiumRef.current.addSpacecraft(spacecraft);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    // Add orbits if enabled
-    if (settings.showOrbits) {
-      debris.slice(0, 50).forEach(d => {
-        cesiumRef.current?.addOrbit(d, true);
+  // Update debris entities based on data and filters
+  useEffect(() => {
+    if (!cesiumLoaded || !viewerRef.current || !debrisData) return;
+
+    const viewer = viewerRef.current;
+
+    try {
+      // Clear all previous debris-related entities
+      debrisEntitiesRef.current.forEach((entity) => {
+        viewer.entities.remove(entity);
       });
+      debrisEntitiesRef.current = [];
+
+      const filteredDebris = debrisData.filter((debris) => {
+        const altitudeInRange =
+          debris.altitude >= filters.altitudeRange[0] &&
+          debris.altitude <= filters.altitudeRange[1];
+        const sizeMatch =
+          filters.sizes.length === 0 || filters.sizes.includes(debris.size);
+        const velocityMatch =
+          getVelocityCategory(debris.velocity) === filters.velocity ||
+          filters.velocity === "all";
+        return altitudeInRange && sizeMatch && velocityMatch;
+      });
+
+      const newEntities: Cesium.Entity[] = [];
+      filteredDebris.forEach((debris) => {
+        try {
+          const position = Cesium.Cartesian3.fromDegrees(
+            debris.lon,
+            debris.lat,
+            debris.altitude * 1000 // altitude from km to meters
+          );
+          const color = getDebrisColor(debris);
+
+          // FIX: The orbital path is now an ellipse graphic attached to the main entity.
+          // This solves the memory leak (it's removed with the parent entity) and
+          // renders a more visually representative orbit at the correct altitude.
+          let ellipseGraphics;
+          if (debris.altitude < 2000) {
+            const earthRadius = 6371000; // meters
+            const orbitRadius = earthRadius + debris.altitude * 1000;
+            ellipseGraphics = {
+              semiMajorAxis: orbitRadius,
+              semiMinorAxis: orbitRadius,
+              material: color.withAlpha(0.2),
+              height: debris.altitude * 1000,
+              outline: true,
+              outlineColor: color.withAlpha(0.4),
+              outlineWidth: 1,
+            };
+          }
+
+          const entity = viewer.entities.add({
+            position,
+            point: {
+              pixelSize: getDebrisRenderSize(debris.size),
+              color,
+              outlineColor: Cesium.Color.WHITE.withAlpha(0.7),
+              outlineWidth: 1,
+              scaleByDistance: new Cesium.NearFarScalar(1.5e5, 1.5, 8.0e6, 0.5),
+            },
+            ellipse: ellipseGraphics, // Add the ellipse here
+          });
+
+          // Attach original data to the entity for easy access on click
+          (entity as any).debrisData = debris;
+          newEntities.push(entity);
+        } catch (err) {
+          console.error("Error adding debris entity:", err);
+        }
+      });
+
+      debrisEntitiesRef.current = newEntities;
+    } catch (error) {
+      console.log(error);
+      console.error("Error updating debris entities:");
+      setError(`Failed to update debris:`);
     }
-  }, [debris, spacecraft, settings.showOrbits]);
+  }, [cesiumLoaded, debrisData, filters]);
 
-  const handleZoomToISS = () => {
-    cesiumRef.current?.zoomToISS();
+  // Utility Functions
+  const calculateRisk = (debris: Debris): RiskLevel => {
+    // Simplified risk calculation
+    if (debris.altitude < 600 && debris.velocity > 8) return "high";
+    if (debris.altitude < 1000 && debris.velocity > 7) return "medium";
+    return "low";
   };
 
-  const handleZoomToEarth = () => {
-    cesiumRef.current?.zoomToEarth();
+  const getDebrisColor = (debris: Debris): Cesium.Color => {
+    const risk = calculateRisk(debris);
+    if (risk === "high") return Cesium.Color.RED;
+    if (risk === "medium") return Cesium.Color.ORANGE;
+    return Cesium.Color.LIMEGREEN;
   };
 
-  if (isLoading) {
+  const getDebrisRenderSize = (size: DebrisSize): number => {
+    if (size === "large") return 10;
+    if (size === "medium") return 7;
+    return 5;
+  };
+
+  const getVelocityCategory = (velocity: number): VelocityCategory => {
+    if (velocity < 4) return "slow";
+    if (velocity < 7) return "medium";
+    return "fast";
+  };
+
+  // Container styles - support both full screen and embedded modes
+  const containerClass = fullScreen
+    ? "fixed inset-0 w-screen h-screen z-50"
+    : "relative w-full h-full min-h-[400px]";
+
+  // The error display component is very well made and helpful for debugging setup issues.
+  if (error) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-gray-900 to-black">
-        <div className="text-white text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>Loading 3D Globe...</p>
-          <p className="text-sm text-gray-400 mt-2">Initializing Cesium visualization</p>
+      <div className={`${containerClass} bg-gray-900 flex items-center justify-center`}>
+        <div className="text-center text-white p-8 max-w-2xl">
+          <h3 className="text-xl font-bold text-red-400 mb-4">
+            Cesium Loading Error
+          </h3>
+          <p className="text-gray-300 mb-4 text-sm">{error}</p>
+          <div className="text-sm text-gray-400 text-left">
+            <p className="font-semibold mb-2">To fix this issue:</p>
+            <div className="bg-gray-800 p-4 rounded-lg space-y-3">
+              <div>
+                <strong>1. Install CesiumJS:</strong>
+                <code className="block bg-gray-700 px-3 py-2 rounded mt-1">
+                  npm install cesium
+                </code>
+              </div>
+
+              <div>
+                <strong>2. Update your vite.config.ts:</strong>
+                <code className="block bg-gray-700 px-3 py-2 rounded mt-1 text-xs whitespace-pre">{`import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
+
+export default defineConfig({
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        { src: 'node_modules/cesium/Build/Cesium/Workers', dest: 'cesium' },
+        { src: 'node_modules/cesium/Build/Cesium/ThirdParty', dest: 'cesium' },
+        { src: 'node_modules/cesium/Build/Cesium/Assets', dest: 'cesium' },
+        { src: 'node_modules/cesium/Build/Cesium/Widgets', dest: 'cesium' }
+      ]
+    })
+  ],
+  define: {
+    CESIUM_BASE_URL: JSON.stringify('/cesium/')
+  }
+})`}</code>
+              </div>
+
+              <div>
+                <strong>3. Install vite-plugin-static-copy:</strong>
+                <code className="block bg-gray-700 px-3 py-2 rounded mt-1">
+                  npm install --save-dev vite-plugin-static-copy
+                </code>
+              </div>
+
+              <div>
+                <strong>4. Get access token from:</strong>{" "}
+                <a
+                  href="https://cesium.com/ion/"
+                  className="text-blue-400 underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  cesium.com/ion
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
+  // Loading state
+  // if (!cesiumLoaded) {
+  //   return (
+  //     <div className={`${containerClass} bg-gray-900 flex items-center justify-center`}>
+  //       <div className="text-center text-white">
+  //         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+  //         <p>Loading Cesium Globe...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
   return (
-    <div className="relative w-full h-full overflow-hidden bg-black">
-      {/* Globe Container */}
+    <div className={containerClass}>
       <div 
-        ref={containerRef} 
+        ref={cesiumContainer} 
         className="w-full h-full"
-        style={{ cursor: 'grab' }}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          minHeight: fullScreen ? '100vh' : '400px'
+        }} 
       />
-      
-      {/* Control Overlay */}
-      <div className="absolute top-4 left-4 bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={handleZoomToISS}
-            className="px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded border border-green-500/30 transition-colors"
-          >
-            Zoom to ISS
-          </button>
-          <button
-            onClick={handleZoomToEarth}
-            className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded border border-blue-500/30 transition-colors"
-          >
-            View Earth
-          </button>
-        </div>
-      </div>
 
-      {/* Statistics Overlay */}
-      <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-        <div className="text-white text-sm space-y-2">
-          <div className="flex justify-between gap-4">
-            <span className="text-gray-400">Debris Objects:</span>
-            <span className="text-white font-mono">{debris.length.toLocaleString()}</span>
+      {selectedDebris && (
+        <div className="absolute top-4 left-4 bg-black bg-opacity-80 text-white p-4 rounded-lg backdrop-blur-sm border border-cyan-500 shadow-lg w-64 animate-fade-in">
+          <div className="flex justify-between items-start">
+            <h3 className="font-bold text-lg text-cyan-300 mb-2">
+              {selectedDebris.name}
+            </h3>
+            <button
+              onClick={() => setSelectedDebris(null)}
+              className="text-gray-400 hover:text-white text-xl leading-none"
+            >
+              ×
+            </button>
           </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-gray-400">Spacecraft:</span>
-            <span className="text-white font-mono">{spacecraft.length}</span>
-          </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-gray-400">High Risk:</span>
-            <span className="text-red-400 font-mono">
-              {debris.filter(d => d.riskLevel === 'high' || d.riskLevel === 'critical').length}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-        <h3 className="text-white font-semibold mb-3">Risk Levels</h3>
-        <div className="space-y-2">
-          {[
-            { level: 'Critical', color: '#ff0000' },
-            { level: 'High', color: '#ff6600' },
-            { level: 'Medium', color: '#ffcc00' },
-            { level: 'Low', color: '#00ff00' }
-          ].map(({ level, color }) => (
-            <div key={level} className="flex items-center gap-2">
-              <div 
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-gray-300 text-sm">{level}</span>
+          <div className="space-y-1 text-sm">
+            <div>
+              ID:{" "}
+              <span className="text-cyan-300 font-mono">
+                {selectedDebris.id}
+              </span>
             </div>
-          ))}
-          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-white/10">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="text-gray-300 text-sm">ISS</span>
+            <div>
+              Altitude:{" "}
+              <span className="text-cyan-300">
+                {selectedDebris.altitude} km
+              </span>
+            </div>
+            <div>
+              Size:{" "}
+              <span className="text-cyan-300 capitalize">
+                {selectedDebris.size}
+              </span>
+            </div>
+            <div>
+              Velocity:{" "}
+              <span className="text-cyan-300">
+                {selectedDebris.velocity} km/s
+              </span>
+            </div>
+            <div>
+              Mass:{" "}
+              <span className="text-cyan-300">{selectedDebris.mass} kg</span>
+            </div>
+            <div>
+              Type:{" "}
+              <span className="text-cyan-300 capitalize">
+                {selectedDebris.type}
+              </span>
+            </div>
+            <div>
+              Risk:{" "}
+              <span
+                className={`capitalize font-bold ${
+                  calculateRisk(selectedDebris) === "high"
+                    ? "text-red-400"
+                    : calculateRisk(selectedDebris) === "medium"
+                    ? "text-yellow-400"
+                    : "text-green-400"
+                }`}
+              >
+                {calculateRisk(selectedDebris)}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500" />
-            <span className="text-gray-300 text-sm">Satellites</span>
+        </div>
+      )}
+
+      <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 text-white p-3 rounded-lg backdrop-blur-sm border border-slate-700">
+        <div className="text-xs space-y-1">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-red-500 rounded-full border border-red-300"></div>
+            <span>High Risk</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-orange-400 rounded-full border border-orange-200"></div>
+            <span>Medium Risk</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-lime-500 rounded-full border border-lime-300"></div>
+            <span>Low Risk</span>
           </div>
         </div>
       </div>
 
-      {/* Loading indicator for data updates */}
-      {debris.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="text-white text-center">
-            <div className="animate-pulse w-8 h-8 bg-blue-500 rounded-full mx-auto mb-2"></div>
-            <p>Loading debris data...</p>
-          </div>
-        </div>
+      <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white p-2 rounded text-xs font-mono">
+        <div>Cesium: {cesiumLoaded ? "Ready" : "Loading..."}</div>
+        <div>Total Debris: {debrisData?.length || 0}</div>
+        <div>Visible: {debrisEntitiesRef.current.length}</div>
+      </div>
+
+      {fullScreen && (
+        <button
+          onClick={() => {
+            // You can pass this as a prop or handle it in parent component
+            console.log('Exit full screen requested');
+          }}
+          className="absolute top-4 right-20 bg-black bg-opacity-60 text-white p-2 rounded text-xs hover:bg-opacity-80 transition-colors"
+        >
+          Exit Full Screen
+        </button>
       )}
     </div>
   );
