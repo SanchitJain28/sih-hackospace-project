@@ -13,7 +13,7 @@ import {
   PredictionResult
 } from './types';
 import { MOCK_DEBRIS_DATA, SPACECRAFT_DATA, TLEDataFetcher } from './data/debrisData';
-import { CollisionDetectionSystem } from './utils/collisionDetection';
+import CollisionDetectionSystem from './utils/CollisionDetection';
 
 const INITIAL_SETTINGS: SystemSettings = {
   theme: 'dark',
