@@ -4,7 +4,6 @@ import Globe from './components/Globe';
 import ControlPanel from './components/ControlPanel';
 import Alerts from './components/Alerts';
 import { debrisJson } from './data/debrisData';
-import CesiumGlobe from './components/CesiumGlobe';
 // Import your debris data - adjust the path as needed
 
 // ## Type Definitions
