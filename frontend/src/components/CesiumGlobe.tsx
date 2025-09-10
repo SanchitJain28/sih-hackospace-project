@@ -1,16 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useMemo, useCallback } from 'react';
-import { 
-  Viewer, 
-  Entity, 
-  PointGraphics, 
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import {
+  Viewer,
+  Entity,
+  PointGraphics,
   EllipseGraphics,
-  CameraFlyTo
-} from 'resium';
-import * as Cesium from 'cesium';
+  CameraFlyTo,
+} from "resium";
+import * as Cesium from "cesium";
+import axios from "axios";
 
 // Set your Cesium Ion access token here
-const CESIUM_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzQyYjZkMi02N2MyLTQxYjQtYWI4YS1lNGE5YzMyOGVmNjAiLCJpZCI6MzM5Mjg1LCJpYXQiOjE3NTczMTE3Njh9.d5tL7TnhBysu-6-dof3ws9bSvQex7322RBl-eOn_xuU";
+const CESIUM_ACCESS_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzQyYjZkMi02N2MyLTQxYjQtYWI4YS1lNGE5YzMyOGVmNjAiLCJpZCI6MzM5Mjg1LCJpYXQiOjE3NTczMTE3Njh9.d5tL7TnhBysu-6-dof3ws9bSvQex7322RBl-eOn_xuU";
 
 // Set the token
 if (CESIUM_ACCESS_TOKEN) {
@@ -48,26 +50,76 @@ interface GlobeProps {
 
 // Sample debris data for demonstration
 const sampleDebrisData: Debris[] = [
-  { id: 1, name: "Satellite Fragment A", altitude: 550, velocity: 7.8, size: "large", mass: 150, type: "fragment", lon: 0, lat: 0 },
-  { id: 2, name: "Rocket Body B", altitude: 800, velocity: 7.2, size: "large", mass: 2500, type: "rocket body", lon: 45, lat: 30 },
-  { id: 3, name: "Debris Piece C", altitude: 400, velocity: 8.1, size: "small", mass: 5, type: "fragment", lon: -120, lat: 35 },
-  { id: 4, name: "Solar Panel D", altitude: 1200, velocity: 6.8, size: "medium", mass: 80, type: "solar panel", lon: 120, lat: -20 },
-  { id: 5, name: "Antenna Fragment E", altitude: 350, velocity: 8.5, size: "small", mass: 2, type: "antenna", lon: -75, lat: 40 },
+  {
+    id: 1,
+    name: "Satellite Fragment A",
+    altitude: 550,
+    velocity: 7.8,
+    size: "large",
+    mass: 150,
+    type: "fragment",
+    lon: 0,
+    lat: 0,
+  },
+  {
+    id: 2,
+    name: "Rocket Body B",
+    altitude: 800,
+    velocity: 7.2,
+    size: "large",
+    mass: 2500,
+    type: "rocket body",
+    lon: 45,
+    lat: 30,
+  },
+  {
+    id: 3,
+    name: "Debris Piece C",
+    altitude: 400,
+    velocity: 8.1,
+    size: "small",
+    mass: 5,
+    type: "fragment",
+    lon: -120,
+    lat: 35,
+  },
+  {
+    id: 4,
+    name: "Solar Panel D",
+    altitude: 1200,
+    velocity: 6.8,
+    size: "medium",
+    mass: 80,
+    type: "solar panel",
+    lon: 120,
+    lat: -20,
+  },
+  {
+    id: 5,
+    name: "Antenna Fragment E",
+    altitude: 350,
+    velocity: 8.5,
+    size: "small",
+    mass: 2,
+    type: "antenna",
+    lon: -75,
+    lat: 40,
+  },
 ];
 
 const defaultFilters: Filters = {
   altitudeRange: [0, 2000],
   sizes: ["small", "medium", "large"],
-  velocity: "all"
+  velocity: "all",
 };
 
-const CesiumResiumGlobe: React.FC<GlobeProps> = ({ 
-  debrisData = sampleDebrisData, 
-  filters = defaultFilters, 
-  fullScreen = false 
+const CesiumResiumGlobe: React.FC<GlobeProps> = ({
+  filters = defaultFilters,
+  fullScreen = false,
 }) => {
   const [selectedDebris, setSelectedDebris] = useState<Debris | null>(null);
   const [, setViewer] = useState<Cesium.Viewer | null>(null);
+  const [debrisData, setDebrisData] = useState<any>(sampleDebrisData);
 
   // Utility Functions
   const calculateRisk = useCallback((debris: Debris): RiskLevel => {
@@ -76,12 +128,15 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
     return "low";
   }, []);
 
-  const getDebrisColor = useCallback((debris: Debris): Cesium.Color => {
-    const risk = calculateRisk(debris);
-    if (risk === "high") return Cesium.Color.RED;
-    if (risk === "medium") return Cesium.Color.ORANGE;
-    return Cesium.Color.LIMEGREEN;
-  }, [calculateRisk]);
+  const getDebrisColor = useCallback(
+    (debris: Debris): Cesium.Color => {
+      const risk = calculateRisk(debris);
+      if (risk === "high") return Cesium.Color.RED;
+      if (risk === "medium") return Cesium.Color.ORANGE;
+      return Cesium.Color.LIMEGREEN;
+    },
+    [calculateRisk]
+  );
 
   const getDebrisRenderSize = useCallback((size: DebrisSize): number => {
     if (size === "large") return 10;
@@ -89,12 +144,34 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
     return 5;
   }, []);
 
-  const getVelocityCategory = useCallback((velocity: number): VelocityCategory => {
-    if (velocity < 4) return "slow";
-    if (velocity < 7) return "medium";
-    return "fast";
-  }, []);
+  const getVelocityCategory = useCallback(
+    (velocity: number): VelocityCategory => {
+      if (velocity < 4) return "slow";
+      if (velocity < 7) return "medium";
+      return "fast";
+    },
+    []
+  );
 
+  const fetchRealDebris = async () => {
+    console.log("TRIGGERED")
+    try {
+      const {
+        data: { data },
+      } = await axios.get("http://localhost:3000/fetch-debris-positions");
+      setDebrisData(data);
+      console.log(data)
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+
+  useEffect(() => {
+    console.log("TRIGGERED")
+    fetchRealDebris()
+  }, [])
+  
   // Filter debris data
   const filteredDebris = useMemo(() => {
     return debrisData.filter((debris) => {
@@ -123,7 +200,7 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
   // Handle viewer ready
   const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
     setViewer(viewer);
-    
+
     // Configure viewer
     viewer.scene.globe.enableLighting = true;
     viewer.scene.backgroundColor = Cesium.Color.BLACK;
@@ -136,13 +213,19 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
     handler.setInputAction((event: any) => {
       const pickedObject = viewer.scene.pick(event.position);
-      if (Cesium.defined(pickedObject) && (pickedObject.id as any)?.debrisData) {
+      if (
+        Cesium.defined(pickedObject) &&
+        (pickedObject.id as any)?.debrisData
+      ) {
         setSelectedDebris((pickedObject.id as any).debrisData);
       } else {
         setSelectedDebris(null);
       }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }, []);
+
+  const creditContainer = useMemo(() => document.createElement("div"), []);
+
 
   // Container styles
   const containerClass = fullScreen
@@ -171,15 +254,15 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
         sceneModePicker={false}
         selectionIndicator={false}
         navigationHelpButton={false}
-        creditContainer={document.createElement("div")}
+        creditContainer={creditContainer}
         ref={(ref) => {
           if (ref?.cesiumElement) {
             handleViewerReady(ref.cesiumElement);
           }
         }}
         style={{
-          width: '100%',
-          height: fullScreen ? '100vh' : '400px',
+          width: "100%",
+          height: fullScreen ? "100vh" : "400px",
         }}
       >
         <CameraFlyTo
@@ -187,8 +270,8 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
           orientation={cameraOrientation}
           duration={0}
         />
-        
-        {filteredDebris.map((debris) => {
+
+        {filteredDebris.map((debris: Debris) => {
           const position = Cesium.Cartesian3.fromDegrees(
             debris.lon,
             debris.lat,
@@ -214,7 +297,9 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
                 color={color}
                 outlineColor={Cesium.Color.WHITE.withAlpha(0.7)}
                 outlineWidth={1}
-                scaleByDistance={new Cesium.NearFarScalar(1.5e5, 1.5, 8.0e6, 0.5)}
+                scaleByDistance={
+                  new Cesium.NearFarScalar(1.5e5, 1.5, 8.0e6, 0.5)
+                }
               />
               {debris.altitude < 2000 && (
                 <EllipseGraphics
@@ -327,7 +412,7 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
       {/* Full Screen Exit Button */}
       {fullScreen && (
         <button
-          onClick={() => console.log('Exit full screen requested')}
+          onClick={() => console.log("Exit full screen requested")}
           className="absolute top-4 right-20 bg-black bg-opacity-60 text-white p-2 rounded text-xs hover:bg-opacity-80 transition-colors"
         >
           Exit Full Screen

@@ -1,10 +1,12 @@
 import express, { Application, Request, Response } from "express";
 import dotenv from "dotenv";
 import router from "./api/routes/Spaceroute";
+import cors from "cors";
 dotenv.config();
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
 app.use(router);
 

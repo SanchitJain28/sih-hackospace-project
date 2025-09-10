@@ -10,7 +10,7 @@ interface TLEObject {
   norad_id: number;
   tle_line1: string;
   tle_line2: string;
-  object_type: 'satellite' | 'debris';
+  object_type: "satellite" | "debris";
 }
 
 interface SatellitePosition {
@@ -29,31 +29,42 @@ interface SatellitePosition {
 // Celestrak data sources configuration
 const CELESTRAK_SOURCES = {
   satellites: {
-    starlink: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle',
-    stations: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
-    active: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle',
-    geo: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=geo&FORMAT=tle'
+    starlink:
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
+    stations:
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle",
+    active:
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+    geo: "https://celestrak.org/NORAD/elements/gp.php?GROUP=geo&FORMAT=tle",
   },
   debris: {
-    debris: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=debris&FORMAT=tle',
-    analyst: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle'
-  }
+    debris:
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=debris&FORMAT=tle",
+    analyst:
+      "https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle",
+  },
 };
 
 // Utility function to parse TLE data
-const parseTLEData = (rawData: string, objectType: 'satellite' | 'debris' = 'satellite'): TLEObject[] => {
-  const lines = rawData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+const parseTLEData = (
+  rawData: string,
+  objectType: "satellite" | "debris" = "satellite"
+): TLEObject[] => {
+  const lines = rawData
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   const tleObjects: TLEObject[] = [];
 
   for (let i = 0; i < lines.length; i += 3) {
     if (i + 2 >= lines.length) continue; // Skip incomplete blocks
-    
+
     const name = lines[i];
     const tle_line1 = lines[i + 1];
     const tle_line2 = lines[i + 2];
-    
+
     // Validate TLE format
-    if (!tle_line1.startsWith('1 ') || !tle_line2.startsWith('2 ')) {
+    if (!tle_line1.startsWith("1 ") || !tle_line2.startsWith("2 ")) {
       console.warn(`Invalid TLE format for ${name}`);
       continue;
     }
@@ -70,7 +81,7 @@ const parseTLEData = (rawData: string, objectType: 'satellite' | 'debris' = 'sat
         norad_id,
         tle_line1,
         tle_line2,
-        object_type: objectType
+        object_type: objectType,
       });
     } catch (error) {
       console.warn(`Error parsing TLE for ${name}:`, error);
@@ -81,13 +92,15 @@ const parseTLEData = (rawData: string, objectType: 'satellite' | 'debris' = 'sat
 };
 
 // Enhanced TLE data fetcher with multiple sources
-export const fetchTLEFromCelestrak = async (source: string): Promise<string> => {
+export const fetchTLEFromCelestrak = async (
+  source: string
+): Promise<string> => {
   try {
     const { data } = await axios.get(source, {
       timeout: 30000, // 30 second timeout
       headers: {
-        'User-Agent': 'Space-Tracker-API/1.0'
-      }
+        "User-Agent": "Space-Tracker-API/1.0",
+      },
     });
     return data;
   } catch (error) {
@@ -99,11 +112,11 @@ export const fetchTLEFromCelestrak = async (source: string): Promise<string> => 
 // Test TLE parsing with satellite-js
 export const testTLEParsing = async (req: Request, res: Response) => {
   try {
-    const sampleTLE = TLE_DATA.split('\n').slice(0, 3);
+    const sampleTLE = TLE_DATA.split("\n").slice(0, 3);
     if (sampleTLE.length < 3) {
       return res.status(400).json({
         status: false,
-        message: "Insufficient TLE data for testing"
+        message: "Insufficient TLE data for testing",
       });
     }
 
@@ -118,8 +131,11 @@ export const testTLEParsing = async (req: Request, res: Response) => {
 
     if (positionAndVelocity?.position && positionAndVelocity.velocity) {
       const gmst = satellite.gstime(now);
-      const positionGd = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
-      
+      const positionGd = satellite.eciToGeodetic(
+        positionAndVelocity.position,
+        gmst
+      );
+
       const latitude = satellite.degreesLat(positionGd.latitude);
       const longitude = satellite.degreesLong(positionGd.longitude);
       const altitude = positionGd.height;
@@ -130,21 +146,21 @@ export const testTLEParsing = async (req: Request, res: Response) => {
         data: {
           satellite: {
             name,
-            norad_id: parseInt(line1.substring(2, 7))
+            norad_id: parseInt(line1.substring(2, 7)),
           },
           position: {
             latitude,
             longitude,
-            altitude
+            altitude,
           },
           velocity: positionAndVelocity.velocity,
-          timestamp: now
-        }
+          timestamp: now,
+        },
       });
     } else {
       return res.status(400).json({
         status: false,
-        message: "Failed to calculate satellite position"
+        message: "Failed to calculate satellite position",
       });
     }
   } catch (error) {
@@ -152,7 +168,7 @@ export const testTLEParsing = async (req: Request, res: Response) => {
     return res.status(500).json({
       status: false,
       message: "TLE parsing test failed",
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -160,34 +176,35 @@ export const testTLEParsing = async (req: Request, res: Response) => {
 // API endpoint for debris data
 export const getDebrisData = async (req: Request, res: Response) => {
   try {
-    const { source = 'debris' } = req.query;
-    const debrisSource = CELESTRAK_SOURCES.debris[source as keyof typeof CELESTRAK_SOURCES.debris];
-    
+    const { source = "debris" } = req.query;
+    const debrisSource =
+      CELESTRAK_SOURCES.debris[source as keyof typeof CELESTRAK_SOURCES.debris];
+
     if (!debrisSource) {
       return res.status(400).json({
         status: false,
-        message: "Invalid debris source. Available sources: debris, analyst"
+        message: "Invalid debris source. Available sources: debris, analyst",
       });
     }
 
     const rawData = await fetchTLEFromCelestrak(debrisSource);
-    const debrisTLEs = parseTLEData(rawData, 'debris');
+    const debrisTLEs = parseTLEData(rawData, "debris");
 
     res.status(200).json({
       status: true,
       data: {
         source: source,
         count: debrisTLEs.length,
-        objects: debrisTLEs
+        objects: debrisTLEs,
       },
-      message: "Debris data fetched successfully"
+      message: "Debris data fetched successfully",
     });
   } catch (error) {
     console.error("Error fetching debris data:", error);
     return res.status(500).json({
       status: false,
       message: "Failed to fetch debris data",
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -196,16 +213,18 @@ export const getDebrisData = async (req: Request, res: Response) => {
 export const getSpaceWeatherData = async (req: Request, res: Response) => {
   try {
     // Fetch space weather data from NOAA or other sources
-    const spaceWeatherUrl = 'https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json';
-    
+    const spaceWeatherUrl =
+      "https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json";
+
     const { data: solarData } = await axios.get(spaceWeatherUrl, {
-      timeout: 15000
+      timeout: 15000,
     });
 
     // You can also add more space weather data sources
-    const geostormUrl = 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json';
+    const geostormUrl =
+      "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
     const { data: geostormData } = await axios.get(geostormUrl, {
-      timeout: 15000
+      timeout: 15000,
     });
 
     res.status(200).json({
@@ -213,16 +232,16 @@ export const getSpaceWeatherData = async (req: Request, res: Response) => {
       data: {
         solar_cycle: solarData.slice(-30), // Last 30 data points
         planetary_k_index: geostormData.slice(-24), // Last 24 hours
-        timestamp: new Date()
+        timestamp: new Date(),
       },
-      message: "Space weather data fetched successfully"
+      message: "Space weather data fetched successfully",
     });
   } catch (error) {
     console.error("Error fetching space weather data:", error);
     return res.status(500).json({
       status: false,
       message: "Failed to fetch space weather data",
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -230,50 +249,58 @@ export const getSpaceWeatherData = async (req: Request, res: Response) => {
 // Enhanced satellite data fetching with multiple sources
 export const getSatelliteData = async (req: Request, res: Response) => {
   try {
-    const { source = 'starlink', calculate_positions = 'false' } = req.query;
-    const satelliteSource = CELESTRAK_SOURCES.satellites[source as keyof typeof CELESTRAK_SOURCES.satellites];
-    
+    const { source = "starlink", calculate_positions = "false" } = req.query;
+    const satelliteSource =
+      CELESTRAK_SOURCES.satellites[
+        source as keyof typeof CELESTRAK_SOURCES.satellites
+      ];
+
     if (!satelliteSource) {
       return res.status(400).json({
         status: false,
-        message: "Invalid satellite source. Available sources: starlink, stations, active, geo"
+        message:
+          "Invalid satellite source. Available sources: starlink, stations, active, geo",
       });
     }
 
     const rawData = await fetchTLEFromCelestrak(satelliteSource);
-    const satelliteTLEs = parseTLEData(rawData, 'satellite');
+    const satelliteTLEs = parseTLEData(rawData, "satellite");
 
     let response: any = {
       status: true,
       data: {
         source: source,
         count: satelliteTLEs.length,
-        objects: satelliteTLEs
+        objects: satelliteTLEs,
       },
-      message: "Satellite data fetched successfully"
+      message: "Satellite data fetched successfully",
     };
 
     // Calculate current positions if requested
-    if (calculate_positions === 'true') {
+    if (calculate_positions === "true") {
       const positions: any[] = [];
       const now = new Date();
 
-      for (const tle of satelliteTLEs.slice(0, 10)) { // Limit to first 10 for performance
+      for (const tle of satelliteTLEs.slice(0, 10)) {
+        // Limit to first 10 for performance
         try {
           const satrec = satellite.twoline2satrec(tle.tle_line1, tle.tle_line2);
           const positionAndVelocity = satellite.propagate(satrec, now);
 
           if (positionAndVelocity?.position) {
             const gmst = satellite.gstime(now);
-            const positionGd = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
-            
+            const positionGd = satellite.eciToGeodetic(
+              positionAndVelocity.position,
+              gmst
+            );
+
             positions.push({
               norad_id: tle.norad_id,
               name: tle.name,
               latitude: satellite.degreesLat(positionGd.latitude),
               longitude: satellite.degreesLong(positionGd.longitude),
               altitude: positionGd.height,
-              velocity: positionAndVelocity.velocity
+              velocity: positionAndVelocity.velocity,
             });
           }
         } catch (error) {
@@ -290,46 +317,54 @@ export const getSatelliteData = async (req: Request, res: Response) => {
     return res.status(500).json({
       status: false,
       message: "Failed to fetch satellite data",
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
 // Improved database save function with batch processing and error handling
-export const saveSatelliteDataToDatabase = async (req: Request, res: Response) => {
+export const saveSatelliteDataToDatabase = async (
+  req: Request,
+  res: Response
+) => {
   try {
-    const { 
-      source = 'starlink', 
-      calculate_positions = 'true',
-      object_type = 'satellite' 
+    const {
+      source = "starlink",
+      calculate_positions = "true",
+      object_type = "satellite",
     } = req.body;
 
     let rawData: string;
-    
+
     // Fetch fresh data or use cached data
-    if (source === 'fast') {
+    if (source === "fast") {
       rawData = TLE_DATA;
     } else {
-      const sourceUrl = object_type === 'debris' 
-        ? CELESTRAK_SOURCES.debris[source as keyof typeof CELESTRAK_SOURCES.debris]
-        : CELESTRAK_SOURCES.satellites[source as keyof typeof CELESTRAK_SOURCES.satellites];
-      
+      const sourceUrl =
+        object_type === "debris"
+          ? CELESTRAK_SOURCES.debris[
+              source as keyof typeof CELESTRAK_SOURCES.debris
+            ]
+          : CELESTRAK_SOURCES.satellites[
+              source as keyof typeof CELESTRAK_SOURCES.satellites
+            ];
+
       if (!sourceUrl) {
         return res.status(400).json({
           status: false,
-          message: "Invalid source specified"
+          message: "Invalid source specified",
         });
       }
-      
+
       rawData = await fetchTLEFromCelestrak(sourceUrl);
     }
 
     const tleObjects = parseTLEData(rawData, object_type);
-    
+
     if (tleObjects.length === 0) {
       return res.status(400).json({
         status: false,
-        message: "No valid TLE objects found"
+        message: "No valid TLE objects found",
       });
     }
 
@@ -340,15 +375,15 @@ export const saveSatelliteDataToDatabase = async (req: Request, res: Response) =
     // Save satellites/debris in chunks
     for (let i = 0; i < tleObjects.length; i += chunkSize) {
       const chunk = tleObjects.slice(i, i + chunkSize);
-      
+
       try {
         const { error, count } = await supabase
           .from("satellites")
-          .upsert(chunk, { 
-            onConflict: 'norad_id',
-            count: 'exact'
+          .upsert(chunk, {
+            onConflict: "norad_id",
+            count: "exact",
           });
-        
+
         if (error) {
           console.error(`Insert error for chunk ${i}-${i + chunkSize}:`, error);
         } else {
@@ -360,7 +395,7 @@ export const saveSatelliteDataToDatabase = async (req: Request, res: Response) =
     }
 
     // Calculate and save positions if requested
-    if (calculate_positions === 'true' || calculate_positions === true) {
+    if (calculate_positions === "true" || calculate_positions === true) {
       const now = new Date();
       const positions: SatellitePosition[] = [];
 
@@ -381,19 +416,24 @@ export const saveSatelliteDataToDatabase = async (req: Request, res: Response) =
           if (!positionAndVelocity?.position) continue;
 
           const gmst = satellite.gstime(now);
-          const positionGd = satellite.eciToGeodetic(positionAndVelocity.position, gmst);
+          const positionGd = satellite.eciToGeodetic(
+            positionAndVelocity.position,
+            gmst
+          );
 
           const position: SatellitePosition = {
             satellite_id: satData.id,
             latitude: satellite.degreesLat(positionGd.latitude),
             longitude: satellite.degreesLong(positionGd.longitude),
             altitude: positionGd.height,
-            velocity: positionAndVelocity.velocity ? {
-              x: positionAndVelocity.velocity.x,
-              y: positionAndVelocity.velocity.y,
-              z: positionAndVelocity.velocity.z
-            } : null,
-            timestamp: now
+            velocity: positionAndVelocity.velocity
+              ? {
+                  x: positionAndVelocity.velocity.x,
+                  y: positionAndVelocity.velocity.y,
+                  z: positionAndVelocity.velocity.z,
+                }
+              : null,
+            timestamp: now,
           };
 
           positions.push(position);
@@ -405,19 +445,25 @@ export const saveSatelliteDataToDatabase = async (req: Request, res: Response) =
       // Save positions in chunks
       for (let i = 0; i < positions.length; i += chunkSize) {
         const chunk = positions.slice(i, i + chunkSize);
-        
+
         try {
           const { error, count } = await supabase
             .from("satellite_positions")
-            .insert(chunk, { count: 'exact' });
-          
+            .insert(chunk, { count: "exact" });
+
           if (error) {
-            console.error(`Position insert error for chunk ${i}-${i + chunkSize}:`, error);
+            console.error(
+              `Position insert error for chunk ${i}-${i + chunkSize}:`,
+              error
+            );
           } else {
             positionCount += count || 0;
           }
         } catch (error) {
-          console.error(`Position database error for chunk ${i}-${i + chunkSize}:`, error);
+          console.error(
+            `Position database error for chunk ${i}-${i + chunkSize}:`,
+            error
+          );
         }
       }
     }
@@ -430,16 +476,15 @@ export const saveSatelliteDataToDatabase = async (req: Request, res: Response) =
         saved_objects: savedCount,
         calculated_positions: positionCount,
         source: source,
-        object_type: object_type
-      }
+        object_type: object_type,
+      },
     });
-
   } catch (error) {
     console.error("Database save error:", error);
     return res.status(500).json({
       status: false,
       message: "Failed to save data to database",
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -451,29 +496,31 @@ export const viewTheSpace = async (req: Request, res: Response) => {
     message: "You are Viewing The Space!! Enjoy",
     endpoints: {
       debris: "/api/debris",
-      spaceweather: "/api/spaceweather", 
+      spaceweather: "/api/spaceweather",
       satellites: "/api/satellites",
-      test: "/api/test-tle"
-    }
+      test: "/api/test-tle",
+    },
   });
 };
 
 export const getTLEData = async (req: Request, res: Response) => {
   try {
-    const rawData = await fetchTLEFromCelestrak(CELESTRAK_SOURCES.satellites.starlink);
-    
+    const rawData = await fetchTLEFromCelestrak(
+      CELESTRAK_SOURCES.satellites.starlink
+    );
+
     res.status(200).json({
       status: true,
       data: rawData,
       message: "TLE data fetched successfully",
-      code: "SUCCESS"
+      code: "SUCCESS",
     });
   } catch (error) {
     console.error("Error fetching TLE data:", error);
     return res.status(500).json({
       status: false,
       message: "Failed to fetch TLE data",
-      error: error instanceof Error ? error.message : 'Internal Server Error'
+      error: error instanceof Error ? error.message : "Internal Server Error",
     });
   }
 };
@@ -484,13 +531,80 @@ export const getTLEDataFast = async (req: Request, res: Response) => {
       status: true,
       data: TLE_DATA,
       message: "TLE data fetched successfully (cached)",
-      code: "SUCCESS"
+      code: "SUCCESS",
     });
   } catch (error) {
     console.error("Error:", error);
     return res.status(500).json({
       status: false,
-      message: "Internal Server Error"
+      message: "Internal Server Error",
+    });
+  }
+};
+
+export const fetchDebrisData = async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from("satellites")
+      .select("*")
+      .eq("object", "debris");
+
+    if (error) {
+      return res.status(403).json({
+        status: false,
+        message: "Error fetching Debris Data",
+        error,
+        code: "DATABASE_ERROR_OCCURED",
+      });
+    }
+
+    return res.status(201).json({
+      status: true,
+      message: "Data fetched Succesfully",
+      data,
+      code: "SUCCESS",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+export const fetchDebrisDataPositions = async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from("satellite_positions")
+      .select(
+        `
+    *,
+    satellites!inner(object)
+  `
+      )
+      .eq("satellites.object", "debris")
+
+    if (error) {
+      return res.status(403).json({
+        status: false,
+        message: "Error fetching Debris Data",
+        error,
+        code: "DATABASE_ERROR_OCCURED",
+      });
+    }
+
+    return res.status(201).json({
+      status: true,
+      message: "Data fetched Succesfully",
+      data,
+      code: "SUCCESS",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
     });
   }
 };

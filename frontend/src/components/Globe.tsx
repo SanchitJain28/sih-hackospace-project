@@ -2,41 +2,24 @@
 import * as Cesium from "cesium";
 import React, { useEffect, useRef, useState } from "react";
 
+import type { Debris, Filters, DebrisSize } from "../utils/debrisUtils";
+import { calculateRisk, filterDebris} from "../utils/debrisUtils"; // Import shared utilities
+
 // Set your Cesium Ion access token here
-// You can get a free token from https://cesium.com/ion/
 const CESIUM_ACCESS_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyYzQyYjZkMi02N2MyLTQxYjQtYWI4YS1lNGE5YzMyOGVmNjAiLCJpZCI6MzM5Mjg1LCJpYXQiOjE3NTczMTE3Njh9.d5tL7TnhBysu-6-dof3ws9bSvQex7322RBl-eOn_xuU";
-
-// Type Definitions
-type DebrisSize = "small" | "medium" | "large";
-type VelocityCategory = "slow" | "medium" | "fast";
-type RiskLevel = "high" | "medium" | "low";
-
-interface Debris {
-  id: string | number;
-  name: string;
-  altitude: number; // in km
-  velocity: number; // in km/s
-  size: DebrisSize;
-  mass: number; // in kg
-  type: string;
-  lon: number;
-  lat: number;
-}
-
-interface Filters {
-  altitudeRange: [number, number];
-  sizes: DebrisSize[];
-  velocity: VelocityCategory | "all";
-}
 
 interface GlobeProps {
   debrisData: Debris[];
   filters: Filters;
-  fullScreen?: boolean; // New prop to control full screen mode
+  fullScreen?: boolean;
 }
 
-const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }) => {
+const Globe: React.FC<GlobeProps> = ({
+  debrisData,
+  filters,
+  fullScreen = false,
+}) => {
   const cesiumContainer = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const debrisEntitiesRef = useRef<Cesium.Entity[]>([]);
@@ -58,18 +41,18 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
       }
 
       const viewer = new Cesium.Viewer(cesiumContainer.current, {
-        timeline: false,
-        animation: false,
-        baseLayerPicker: false,
+        timeline: true,
+        animation: true,
+        baseLayerPicker: true,
         fullscreenButton: false,
-        vrButton: false,
-        geocoder: false,
-        homeButton: false,
-        infoBox: false,
-        sceneModePicker: false,
+        vrButton: true,
+        geocoder: true,
+        homeButton: true,
+        infoBox: true,
+        sceneModePicker: true,
         selectionIndicator: false,
-        navigationHelpButton: false,
-        creditContainer: document.createElement("div"), // Hides the default credit display
+        navigationHelpButton: true,
+        creditContainer: document.createElement("div"),
         terrainProvider: undefined,
       });
 
@@ -82,9 +65,8 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
         },
       });
 
-      viewer.scene.globe.enableLighting = true;
+      viewer.scene.globe.enableLighting = false;
       viewer.scene.backgroundColor = Cesium.Color.BLACK;
-      // Improve atmosphere rendering
       viewer.scene.globe.showGroundAtmosphere = true;
       viewer.scene.globe.atmosphereHueShift = -0.04;
       viewer.scene.globe.atmosphereBrightnessShift = -0.1;
@@ -103,7 +85,6 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
         }
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-      // Force resize after initialization to ensure proper dimensions
       setTimeout(() => {
         viewer.resize();
         setCesiumLoaded(true);
@@ -128,7 +109,7 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
     };
   }, []);
 
-  // Handle window resize to keep Cesium responsive
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
@@ -136,11 +117,11 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Update debris entities based on data and filters
+  // Update debris entities using shared filtering logic
   useEffect(() => {
     if (!cesiumLoaded || !viewerRef.current || !debrisData) return;
 
@@ -153,20 +134,12 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
       });
       debrisEntitiesRef.current = [];
 
-      const filteredDebris = debrisData.filter((debris) => {
-        const altitudeInRange =
-          debris.altitude >= filters.altitudeRange[0] &&
-          debris.altitude <= filters.altitudeRange[1];
-        const sizeMatch =
-          filters.sizes.length === 0 || filters.sizes.includes(debris.size);
-        const velocityMatch =
-          getVelocityCategory(debris.velocity) === filters.velocity ||
-          filters.velocity === "all";
-        return altitudeInRange && sizeMatch && velocityMatch;
-      });
-
+      // Use shared filtering function for consistency
+      const filteredDebris = filterDebris(debrisData, filters);
       const newEntities: Cesium.Entity[] = [];
-      filteredDebris.forEach((debris) => {
+
+      // Add debris points
+      filteredDebris.forEach((debris: any) => {
         try {
           const position = Cesium.Cartesian3.fromDegrees(
             debris.lon,
@@ -174,24 +147,6 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
             debris.altitude * 1000 // altitude from km to meters
           );
           const color = getDebrisColor(debris);
-
-          // FIX: The orbital path is now an ellipse graphic attached to the main entity.
-          // This solves the memory leak (it's removed with the parent entity) and
-          // renders a more visually representative orbit at the correct altitude.
-          let ellipseGraphics;
-          if (debris.altitude < 2000) {
-            const earthRadius = 6371000; // meters
-            const orbitRadius = earthRadius + debris.altitude * 1000;
-            ellipseGraphics = {
-              semiMajorAxis: orbitRadius,
-              semiMinorAxis: orbitRadius,
-              material: color.withAlpha(0.2),
-              height: debris.altitude * 1000,
-              outline: true,
-              outlineColor: color.withAlpha(0.4),
-              outlineWidth: 1,
-            };
-          }
 
           const entity = viewer.entities.add({
             position,
@@ -202,10 +157,8 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
               outlineWidth: 1,
               scaleByDistance: new Cesium.NearFarScalar(1.5e5, 1.5, 8.0e6, 0.5),
             },
-            ellipse: ellipseGraphics, // Add the ellipse here
           });
 
-          // Attach original data to the entity for easy access on click
           (entity as any).debrisData = debris;
           newEntities.push(entity);
         } catch (err) {
@@ -213,22 +166,46 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
         }
       });
 
+      // Add connection lines for nearby debris
+      for (let i = 0; i < filteredDebris.length; i++) {
+        for (let j = i + 1; j < filteredDebris.length; j++) {
+          const d1 = filteredDebris[i];
+          const d2 = filteredDebris[j];
+
+          const pos1 = Cesium.Cartesian3.fromDegrees(
+            d1.lon,
+            d1.lat,
+            d1.altitude * 1000
+          );
+          const pos2 = Cesium.Cartesian3.fromDegrees(
+            d2.lon,
+            d2.lat,
+            d2.altitude * 1000
+          );
+
+          const distance = Cesium.Cartesian3.distance(pos1, pos2);
+
+          if (distance < 500000) {
+            const line = viewer.entities.add({
+              polyline: {
+                positions: [pos1, pos2],
+                width: 1,
+                material: Cesium.Color.CYAN.withAlpha(0.3),
+              },
+            });
+            newEntities.push(line);
+          }
+        }
+      }
+
       debrisEntitiesRef.current = newEntities;
     } catch (error) {
-      console.log(error);
-      console.error("Error updating debris entities:");
-      setError(`Failed to update debris:`);
+      console.error("Error updating debris entities:", error);
+      setError(`Failed to update debris`);
     }
   }, [cesiumLoaded, debrisData, filters]);
 
-  // Utility Functions
-  const calculateRisk = (debris: Debris): RiskLevel => {
-    // Simplified risk calculation
-    if (debris.altitude < 600 && debris.velocity > 8) return "high";
-    if (debris.altitude < 1000 && debris.velocity > 7) return "medium";
-    return "low";
-  };
-
+  // Use shared risk calculation for consistent coloring
   const getDebrisColor = (debris: Debris): Cesium.Color => {
     const risk = calculateRisk(debris);
     if (risk === "high") return Cesium.Color.RED;
@@ -242,21 +219,17 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
     return 5;
   };
 
-  const getVelocityCategory = (velocity: number): VelocityCategory => {
-    if (velocity < 4) return "slow";
-    if (velocity < 7) return "medium";
-    return "fast";
-  };
-
-  // Container styles - support both full screen and embedded modes
+  // Container styles
   const containerClass = fullScreen
     ? "fixed inset-0 w-screen h-screen z-50"
     : "relative w-full h-full min-h-[400px]";
 
-  // The error display component is very well made and helpful for debugging setup issues.
+  // Error display
   if (error) {
     return (
-      <div className={`${containerClass} bg-gray-900 flex items-center justify-center`}>
+      <div
+        className={`${containerClass} bg-gray-900 flex items-center justify-center`}
+      >
         <div className="text-center text-white p-8 max-w-2xl">
           <h3 className="text-xl font-bold text-red-400 mb-4">
             Cesium Loading Error
@@ -271,7 +244,6 @@ const Globe: React.FC<GlobeProps> = ({ debrisData, filters, fullScreen = false }
                   npm install cesium
                 </code>
               </div>
-
               <div>
                 <strong>2. Update your vite.config.ts:</strong>
                 <code className="block bg-gray-700 px-3 py-2 rounded mt-1 text-xs whitespace-pre">{`import { defineConfig } from 'vite'
@@ -295,14 +267,12 @@ export default defineConfig({
   }
 })`}</code>
               </div>
-
               <div>
                 <strong>3. Install vite-plugin-static-copy:</strong>
                 <code className="block bg-gray-700 px-3 py-2 rounded mt-1">
                   npm install --save-dev vite-plugin-static-copy
                 </code>
               </div>
-
               <div>
                 <strong>4. Get access token from:</strong>{" "}
                 <a
@@ -316,7 +286,6 @@ export default defineConfig({
               </div>
             </div>
           </div>
-
           <button
             onClick={() => window.location.reload()}
             className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
@@ -328,28 +297,16 @@ export default defineConfig({
     );
   }
 
-  // Loading state
-  // if (!cesiumLoaded) {
-  //   return (
-  //     <div className={`${containerClass} bg-gray-900 flex items-center justify-center`}>
-  //       <div className="text-center text-white">
-  //         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-  //         <p>Loading Cesium Globe...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
   return (
     <div className={containerClass}>
-      <div 
-        ref={cesiumContainer} 
+      <div
+        ref={cesiumContainer}
         className="w-full h-full"
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          minHeight: fullScreen ? '100vh' : '400px'
-        }} 
+        style={{
+          width: "100%",
+          height: "100%",
+          minHeight: fullScreen ? "100vh" : "400px",
+        }}
       />
 
       {selectedDebris && (
@@ -435,7 +392,7 @@ export default defineConfig({
         </div>
       </div>
 
-      <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white p-2 rounded text-xs font-mono">
+      <div className="absolute top-4 left-12 bg-black bg-opacity-60 text-white p-2 rounded text-xs font-mono">
         <div>Cesium: {cesiumLoaded ? "Ready" : "Loading..."}</div>
         <div>Total Debris: {debrisData?.length || 0}</div>
         <div>Visible: {debrisEntitiesRef.current.length}</div>
@@ -444,8 +401,7 @@ export default defineConfig({
       {fullScreen && (
         <button
           onClick={() => {
-            // You can pass this as a prop or handle it in parent component
-            console.log('Exit full screen requested');
+            console.log("Exit full screen requested");
           }}
           className="absolute top-4 right-20 bg-black bg-opacity-60 text-white p-2 rounded text-xs hover:bg-opacity-80 transition-colors"
         >

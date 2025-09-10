@@ -38,10 +38,9 @@ export default defineConfig({
     include: ['cesium']
   },
   server: {
-    // Configure dev server
-    fs: {
-      allow: ['..']
-    }
+    allowedHosts: ["9360206d965b.ngrok-free.app"], // 👈 add your ngrok subdomain here
+    host: "0.0.0.0",  // ensure accessible from outside localhost
+    port: 5173        // or whatever port you run on
   },
   build: {
     // Increase chunk size limit for cesium

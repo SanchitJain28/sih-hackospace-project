@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import { AlertTriangle, Shield, AlertCircle, Zap } from 'lucide-react';
 
 // ## Type Definitions
@@ -6,15 +6,28 @@ import { AlertTriangle, Shield, AlertCircle, Zap } from 'lucide-react';
 // Defines the possible risk levels
 type RiskLevel = 'high' | 'medium' | 'low';
 
-// Defines the possible sizes for debris objects. Adjust if you have other sizes.
+// Defines the possible sizes for debris objects
 type DebrisSize = 'small' | 'medium' | 'large';
 
-// Defines the velocity categories based on your getVelocityCategory function
+// Defines the velocity categories
 type VelocityCategory = 'slow' | 'medium' | 'fast';
 
-// Interface for a single debris object
+// Interface for the raw debris data object from the JSON file
+interface RawDebrisVelocity {
+    x: number;
+    y: number;
+    z: number;
+}
+interface RawDebris {
+    id: string;
+    satellite_id: string;
+    altitude: number;
+    velocity: RawDebrisVelocity;
+}
+
+// Interface for a processed debris object
 interface Debris {
-  id: string | number; // Unique identifier
+  id: string;
   name: string;
   altitude: number; // in kilometers
   velocity: number; // in km/s
@@ -30,24 +43,64 @@ interface Filters {
 }
 
 // Interface for the component's props
-interface AlertsProps {
-  debrisData: Debris[];
+interface AlertsPanelProps {
+  rawDebrisData: RawDebris[];
   filters: Filters;
 }
 
+// ## Helper Functions for Data Transformation
+
+// Function to assign a size based on altitude
+const getSize = (altitude: number): DebrisSize => {
+    if (altitude > 550) return 'small';
+    if (altitude > 400) return 'medium';
+    return 'large';
+};
+
+// Function to assign a mass based on derived size
+const getMass = (size: DebrisSize): number => {
+    switch (size) {
+        case 'small': return 50; // kg
+        case 'medium': return 250; // kg
+        case 'large': return 1000; // kg
+        default: return 0;
+    }
+};
 
 // ## Component Implementation
 
-const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
+const AlertsPanel: React.FC<AlertsPanelProps> = ({ rawDebrisData, filters }) => {
+  // Process raw data into a more usable format with React.useMemo for efficiency
+  const debrisData: Debris[] = React.useMemo(() => {
+    if (!rawDebrisData) return [];
+    return rawDebrisData.map(raw => {
+        const velocityMagnitude = Math.sqrt(
+            raw.velocity.x ** 2 + raw.velocity.y ** 2 + raw.velocity.z ** 2
+        );
+        const size = getSize(raw.altitude);
+        const mass = getMass(size);
+
+        return {
+            id: raw.id,
+            name: `Debris ${raw.satellite_id.substring(0, 8)}`,
+            altitude: Math.round(raw.altitude),
+            velocity: parseFloat(velocityMagnitude.toFixed(1)),
+            size: size,
+            mass: mass,
+        };
+    });
+  }, [rawDebrisData]);
+
+
   const calculateRisk = (debris: Debris): RiskLevel => {
-    if (debris.altitude < 600 && debris.velocity > 8) return 'high';
-    if (debris.altitude < 1000 && debris.velocity > 7) return 'medium';
+    if (debris.altitude < 400 && debris.velocity > 7) return 'high';
+    if (debris.altitude < 550 && debris.velocity > 5) return 'medium';
     return 'low';
   };
 
   const getVelocityCategory = (velocity: number): VelocityCategory => {
     if (velocity < 4) return 'slow';
-    if (velocity < 7) return 'medium';
+    if (velocity <= 7) return 'medium';
     return 'fast';
   };
 
@@ -56,8 +109,7 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
       const altitudeInRange = debris.altitude >= filters.altitudeRange[0] &&
                               debris.altitude <= filters.altitudeRange[1];
       const sizeMatch = filters.sizes.length === 0 || filters.sizes.includes(debris.size);
-      const velocityMatch = getVelocityCategory(debris.velocity) === filters.velocity ||
-                            filters.velocity === 'all';
+      const velocityMatch = filters.velocity === 'all' || getVelocityCategory(debris.velocity) === filters.velocity;
       
       return altitudeInRange && sizeMatch && velocityMatch;
     });
@@ -76,7 +128,6 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
     .sort((a, b) => b.velocity - a.velocity)
     .slice(0, 3);
   
-  // ## Helper Functions for Statistics (to avoid division by zero)
   const calculateAverage = (items: Debris[], key: keyof Debris): number => {
       if (items.length === 0) return 0;
       const total = items.reduce((sum, item) => sum + (item[key] as number), 0);
@@ -97,7 +148,6 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
           <span>Risk Assessment</span>
         </h2>
         
-        {/* Risk Level Cards */}
         <div className="space-y-3">
           <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 rounded-lg border border-red-500 shadow-lg">
             <div className="flex items-center justify-between">
@@ -149,7 +199,6 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
         </div>
       </div>
 
-      {/* Critical Alerts */}
       {criticalAlerts.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
@@ -185,7 +234,6 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
         </div>
       )}
 
-      {/* Statistics */}
       <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
         <h3 className="font-semibold text-white mb-3">Statistics</h3>
         <div className="space-y-2 text-sm">
@@ -206,9 +254,9 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Risk Distribution:</span>
+            <span className="text-gray-400">High-Risk Objects:</span>
             <span className="text-white font-semibold">
-              {highRiskPercentage}% High
+              {highRiskPercentage}%
             </span>
           </div>
         </div>
@@ -217,4 +265,4 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
   );
 };
 
-export default Alerts;
+export default AlertsPanel;

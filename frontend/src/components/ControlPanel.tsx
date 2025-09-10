@@ -70,7 +70,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const resetFilters = () => {
     setFilters({
-      altitudeRange: [0, 40000],
+      altitudeRange: [200, 600],
       sizes: [],
       velocity: "all",
     });
@@ -115,9 +115,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               <input
                 placeholder="Type range"
                 type="range"
-                min="0"
-                max="40000"
-                step="100"
+                min="200"
+                max="600"
+                step="10"
                 value={filters.altitudeRange[0]}
                 onChange={(e) => handleAltitudeChange(e.target.value, 0)}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
@@ -131,9 +131,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               <input
                 title="range"
                 type="range"
-                min="0"
-                max="40000"
-                step="100"
+                min="200"
+                max="600"
+                step="10"
                 value={filters.altitudeRange[1]}
                 onChange={(e) => handleAltitudeChange(e.target.value, 1)}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"

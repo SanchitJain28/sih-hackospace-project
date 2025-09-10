@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.13",
+    "axios": "^1.11.0",
     "cesium": "^1.133.0",
     "cesium-react": "^0.2.2",
     "lucide-react": "^0.542.0",

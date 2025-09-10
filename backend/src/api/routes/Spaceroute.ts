@@ -7,7 +7,9 @@ import {
   getDebrisData,
   getSpaceWeatherData,
   getSatelliteData,
-  testTLEParsing
+  testTLEParsing,
+  fetchDebrisData,
+  fetchDebrisDataPositions
 } from '../../Controllers/SpaceController';
 
 const router = Router();
@@ -23,6 +25,8 @@ router.get("/tle/test", testTLEParsing);
 
 // Debris data endpoint
 router.get("/debris", getDebrisData);
+router.get('/fetch-debris',fetchDebrisData)
+router.get('/fetch-debris-positions',fetchDebrisDataPositions)
 
 // Space weather endpoint  
 router.get("/spaceweather", getSpaceWeatherData);
