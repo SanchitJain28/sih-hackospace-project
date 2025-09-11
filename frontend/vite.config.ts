@@ -49,7 +49,6 @@ export default defineConfig({
       external: [],
       output: {
         manualChunks: {
-          cesium: ['cesium']
         }
       }
     }
