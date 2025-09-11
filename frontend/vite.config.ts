@@ -55,7 +55,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           // You can add specific chunking here if needed
-          cesium: ['cesium']
         }
       }
     }
