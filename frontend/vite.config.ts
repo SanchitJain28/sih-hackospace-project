@@ -7,7 +7,9 @@ import cesium from 'vite-plugin-cesium';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    [react(),tailwindcss(),cesium()],
+    react(),
+    tailwindcss(),
+    cesium(),
     viteStaticCopy({
       targets: [
         {
@@ -29,6 +31,7 @@ export default defineConfig({
       ]
     })
   ],
+  base: './', // Add this for proper asset paths
   define: {
     // Define CESIUM_BASE_URL for proper asset loading
     CESIUM_BASE_URL: JSON.stringify('/cesium/')
@@ -38,17 +41,21 @@ export default defineConfig({
     include: ['cesium']
   },
   server: {
-    allowedHosts: ["9360206d965b.ngrok-free.app"], // 👈 add your ngrok subdomain here
-    host: "0.0.0.0",  // ensure accessible from outside localhost
-    port: 5173        // or whatever port you run on
+    allowedHosts: ["9360206d965b.ngrok-free.app"],
+    host: "0.0.0.0",
+    port: 5173
   },
   build: {
+    outDir: 'dist', // Explicitly set output directory
+    assetsDir: 'assets', // Explicitly set assets directory
     // Increase chunk size limit for cesium
     chunkSizeWarningLimit: 5000,
     rollupOptions: {
       external: [],
       output: {
         manualChunks: {
+          // You can add specific chunking here if needed
+          cesium: ['cesium']
         }
       }
     }
