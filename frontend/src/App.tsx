@@ -141,7 +141,7 @@ const App: React.FC = () => {
     setError(null);
 
     try {
-      const response = await axios.get("http://localhost:3000/fetch-debris-positions");
+      const response = await axios.get("https://sih-hackospace-project-nylg.onrender.com/fetch-debris-positions");
       const apiData: ApiDebrisData[] | undefined = response.data?.data;
 
       if (!apiData || !Array.isArray(apiData)) {
