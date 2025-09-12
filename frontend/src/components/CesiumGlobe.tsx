@@ -174,7 +174,7 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
   
   // Filter debris data
   const filteredDebris = useMemo(() => {
-    return debrisData.filter((debris) => {
+    return debrisData.filter((debris:any) => {
       const altitudeInRange =
         debris.altitude >= filters.altitudeRange[0] &&
         debris.altitude <= filters.altitudeRange[1];
@@ -188,14 +188,14 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
   }, [debrisData, filters, getVelocityCategory]);
 
   // Handle entity click
-  const handleEntityClick = useCallback((entity: Cesium.Entity) => {
-    const debrisData = (entity as any).debrisData;
-    if (debrisData) {
-      setSelectedDebris(debrisData);
-    } else {
-      setSelectedDebris(null);
-    }
-  }, []);
+  // const handleEntityClick = useCallback((entity: Cesium.Entity) => {
+  //   const debrisData = (entity as any).debrisData;
+  //   if (debrisData) {
+  //     setSelectedDebris(debrisData);
+  //   } else {
+  //     setSelectedDebris(null);
+  //   }
+  // }, []);
 
   // Handle viewer ready
   const handleViewerReady = useCallback((viewer: Cesium.Viewer) => {
@@ -285,7 +285,7 @@ const CesiumResiumGlobe: React.FC<GlobeProps> = ({
             <Entity
               key={debris.id}
               position={position}
-              onClick={handleEntityClick}
+              // onClick={handleEntityClick}
               ref={(entity) => {
                 if (entity?.cesiumElement) {
                   (entity.cesiumElement as any).debrisData = debris;
