@@ -393,7 +393,7 @@ export default defineConfig({
         </div>
       </div>
 
-      <div className="absolute top-4 left-12 bg-black bg-opacity-60 text-white p-2 rounded text-xs font-mono">
+      <div className="absolute bottom-4 right-12 bg-black bg-opacity-60 text-white p-2 rounded text-xs font-mono">
         <div>Cesium: {cesiumLoaded ? "Ready" : "Loading..."}</div>
         <div>Total Debris: {debrisData?.length || 0}</div>
         <div>Visible: {debrisEntitiesRef.current.length}</div>
