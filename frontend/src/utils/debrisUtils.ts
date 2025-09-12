@@ -87,7 +87,7 @@ export const generateCoordinates = (id: string, altitude: number): { lon: number
 // **UNIFIED RISK CALCULATION** - This is the single source of truth
 export const calculateRisk = (debris: Debris): RiskLevel => {
   // High risk: very low altitude + high velocity (likely reentry hazard)
-  if (debris.altitude < 400 && debris.velocity > 4.8) return "high";
+  if (debris.altitude < 2000 && debris.velocity > 4.8) return "high";
   
   // Medium risk: crowded orbits (typical LEO ~300-1500 km)
   if (debris.altitude < 550 && debris.velocity > 3.5) return "medium";

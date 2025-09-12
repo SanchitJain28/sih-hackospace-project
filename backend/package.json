@@ -1,4 +1,10 @@
 {
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.2",
     "axios": "^1.11.0",

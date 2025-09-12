@@ -49,6 +49,7 @@ const Globe: React.FC<GlobeProps> = ({
         geocoder: true,
         homeButton: true,
         infoBox: true,
+         
         sceneModePicker: true,
         selectionIndicator: false,
         navigationHelpButton: true,

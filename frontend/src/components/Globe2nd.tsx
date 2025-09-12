@@ -70,7 +70,7 @@ const useCesiumViewer = (containerRef: React.RefObject<HTMLDivElement>) => {
           creditContainer: document.createElement("div"),
           
           // Performance optimizations
-          requestRenderMode: true,
+          requestRenderMode: false,
           maximumRenderTimeChange: Infinity,
           
           // Terrain provider
@@ -94,6 +94,11 @@ const useCesiumViewer = (containerRef: React.RefObject<HTMLDivElement>) => {
             roll: 0,
           },
         });
+
+
+        
+
+
 
         // Performance optimizations
         viewer.scene.globe.tileCacheSize = 100;
@@ -518,7 +523,7 @@ const StatusPanel: React.FC<{ isReady: boolean; totalDebris: number; visibleCoun
 const Globe: React.FC<GlobeProps> = ({ 
   debrisData, 
   filters, 
-  fullScreen = false, 
+  fullScreen = true, 
   onFullScreenToggle,
   onDebrisSelect 
 }) => {
