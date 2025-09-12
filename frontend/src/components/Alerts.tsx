@@ -206,10 +206,10 @@ const Alerts: React.FC<AlertsProps> = ({ debrisData, filters }) => {
                 <div className="mt-3 p-2 bg-red-900 bg-opacity-50 rounded border-l-4 border-red-500">
                   <p className="text-red-100 text-sm">
                     ⚠️ Collision risk due to low altitude and high velocity
-                    orbital parameters
+                    orbital parameter
                   </p>
                 </div>
-              </div>
+              </div>  
             ))}
           </div>
         </div>
